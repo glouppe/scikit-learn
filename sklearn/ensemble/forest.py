@@ -178,9 +178,11 @@ class BaseForest(BaseEnsemble, SelectorMixin):
         """
         # Precompute some data
         X = np.atleast_2d(X)
-        X = np.asarray(X, dtype=DTYPE, order='F')
 
-        y = np.atleast_1d(y)
+        if not hasattr(X, "dtype") or X.dtype != DTYPE or not X.flags.fortan:
+            X = np.asarray(X, dtype=DTYPE, order='F')
+
+            y = np.atleast_1d(y)
 
         if self.bootstrap:
             sample_mask = None
@@ -336,6 +338,10 @@ class ForestClassifier(BaseForest, ClassifierMixin):
         # Check data
         X = np.atleast_2d(X)
 
+        _X = shm.zeros(X.shape, X.dtype)
+        _X[:] = X[:]
+        X = _X
+
         # Assign chunk of trees to jobs
         n_jobs, n_trees, starts = _partition_trees(self)
 
@@ -413,6 +419,10 @@ class ForestRegressor(BaseForest, RegressorMixin):
         """
         # Check data
         X = np.atleast_2d(X)
+
+        _X = shm.zeros(X.shape, X.dtype)
+        _X[:] = X[:]
+        X = _X
 
         # Assign chunk of trees to jobs
         n_jobs, n_trees, starts = _partition_trees(self)

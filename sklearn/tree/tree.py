@@ -346,10 +346,10 @@ def _build_tree(X, y, is_classification, criterion,
                                 depth + 1, node_id, False)
 
     # Launch the construction
-    if X.dtype != DTYPE or not X.flags.fortran:
+    if not hasattr(X, "dtype") or X.dtype != DTYPE or not X.flags.fortran:
         X = np.asanyarray(X, dtype=DTYPE, order="F")
 
-    if y.dtype != DTYPE or not y.flags.contiguous:
+    if not hasattr(y, "dtype") or y.dtype != DTYPE or not y.flags.contiguous:
         y = np.ascontiguousarray(y, dtype=DTYPE)
 
     if sample_mask is None:
@@ -418,7 +418,7 @@ class BaseDecisionTree(BaseEstimator, SelectorMixin):
                 self.min_samples_leaf)
 
         # Convert data
-        if X.dtype != DTYPE or not X.flags.fortran:
+        if not hasattr(X, "dtype") or X.dtype != DTYPE or not X.flags.fortran:
             X = np.asarray(X, dtype=DTYPE, order='F')
 
         n_samples, self.n_features_ = X.shape
@@ -436,7 +436,7 @@ class BaseDecisionTree(BaseEstimator, SelectorMixin):
             self.n_classes_ = 1
             criterion = REGRESSION[self.criterion]()
 
-        if y.dtype != DTYPE or not y.flags.contiguous:
+        if not hasattr(y, "dtype") or y.dtype != DTYPE or not y.flags.contiguous:
             y = np.ascontiguousarray(y, dtype=DTYPE)
 
         # Check parameters
