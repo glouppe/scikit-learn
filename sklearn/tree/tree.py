@@ -346,7 +346,7 @@ def _build_tree(X, y, is_classification, criterion,
                                 depth + 1, node_id, False)
 
     # Launch the construction
-    if X.dtype != DTYPE or not np.isfortran(X):
+    if X.dtype != DTYPE or not X.flags.fortran:
         X = np.asanyarray(X, dtype=DTYPE, order="F")
 
     if y.dtype != DTYPE or not y.flags.contiguous:
@@ -419,7 +419,6 @@ class BaseDecisionTree(BaseEstimator, SelectorMixin):
 
         # Convert data
         if X.dtype != DTYPE or not X.flags.fortran:
-            print "[tree] X converted"
             X = np.asarray(X, dtype=DTYPE, order='F')
 
         n_samples, self.n_features_ = X.shape
@@ -438,7 +437,6 @@ class BaseDecisionTree(BaseEstimator, SelectorMixin):
             criterion = REGRESSION[self.criterion]()
 
         if y.dtype != DTYPE or not y.flags.contiguous:
-            print "[tree] y converted"
             y = np.ascontiguousarray(y, dtype=DTYPE)
 
         # Check parameters
