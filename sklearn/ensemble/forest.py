@@ -36,6 +36,8 @@ The module structure is the following:
 import itertools
 import numpy as np
 
+import sharedmem as shm
+
 from ..base import ClassifierMixin, RegressorMixin
 from ..externals.joblib import Parallel, delayed, cpu_count
 from ..feature_selection.selector_mixin import SelectorMixin
@@ -43,6 +45,7 @@ from ..tree import DecisionTreeClassifier, DecisionTreeRegressor, \
                    ExtraTreeClassifier, ExtraTreeRegressor
 from ..utils import check_random_state
 from ..metrics import r2_score
+from ..tree import _tree
 
 from .base import BaseEnsemble
 
@@ -52,6 +55,7 @@ __all__ = ["RandomForestClassifier",
            "ExtraTreesRegressor"]
 
 MAX_INT = np.iinfo(np.int32).max
+DTYPE = _tree.DTYPE
 
 
 def _parallel_build_trees(n_trees, forest, X, y,
@@ -174,6 +178,8 @@ class BaseForest(BaseEnsemble, SelectorMixin):
         """
         # Precompute some data
         X = np.atleast_2d(X)
+        X = np.asarray(X, dtype=DTYPE, order='F')
+
         y = np.atleast_1d(y)
 
         if self.bootstrap:
@@ -193,6 +199,22 @@ class BaseForest(BaseEnsemble, SelectorMixin):
             self.classes_ = np.unique(y)
             self.n_classes_ = len(self.classes_)
             y = np.searchsorted(self.classes_, y)
+
+        y = np.ascontiguousarray(y, dtype=DTYPE)
+
+        # Pack inputs into shared-memory arrays
+        _X = shm.zeros(X.shape, X.dtype, "F")
+        _X[:] = X[:]
+        X = _X
+
+        _y = shm.zeros(y.shape, y.dtype)
+        _y[:] = y[:]
+        y = _y
+
+        if X_argsorted is not None:
+            _X_argsorted = shm.zeros(X_argsorted.shape, X_argsorted.dtype, "F")
+            _X_argsorted[:] = X_argsorted[:]
+            X_argsorted = _X_argsorted
 
         # Assign chunk of trees to jobs
         n_jobs, n_trees, _ = _partition_trees(self)
@@ -216,6 +238,7 @@ class BaseForest(BaseEnsemble, SelectorMixin):
         if self.oob_score:
             if isinstance(self, ClassifierMixin):
                 predictions = np.zeros((X.shape[0], self.n_classes_))
+
                 for estimator in self.estimators_:
                     mask = np.ones(X.shape[0], dtype=np.bool)
                     mask[estimator.indices_] = False
@@ -229,11 +252,13 @@ class BaseForest(BaseEnsemble, SelectorMixin):
                 # Regression:
                 predictions = np.zeros(X.shape[0])
                 n_predictions = np.zeros(X.shape[0])
+
                 for estimator in self.estimators_:
                     mask = np.ones(X.shape[0], dtype=np.bool)
                     mask[estimator.indices_] = False
                     predictions[mask] += estimator.predict(X[mask, :])
                     n_predictions[mask] += 1
+
                 predictions /= n_predictions
 
                 self.oob_prediction_ = predictions
