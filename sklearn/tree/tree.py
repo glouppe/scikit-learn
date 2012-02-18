@@ -418,7 +418,10 @@ class BaseDecisionTree(BaseEstimator, SelectorMixin):
                 self.min_samples_leaf)
 
         # Convert data
-        X = np.asarray(X, dtype=DTYPE, order='F')
+        if X.dtype != DTYPE or not X.flags.fortran:
+            print "[tree] X converted"
+            X = np.asarray(X, dtype=DTYPE, order='F')
+
         n_samples, self.n_features_ = X.shape
 
         is_classification = isinstance(self, ClassifierMixin)
@@ -434,7 +437,9 @@ class BaseDecisionTree(BaseEstimator, SelectorMixin):
             self.n_classes_ = 1
             criterion = REGRESSION[self.criterion]()
 
-        y = np.ascontiguousarray(y, dtype=DTYPE)
+        if y.dtype != DTYPE or not y.flags.contiguous:
+            print "[tree] y converted"
+            y = np.ascontiguousarray(y, dtype=DTYPE)
 
         # Check parameters
         max_depth = np.inf if self.max_depth is None else self.max_depth
