@@ -182,7 +182,7 @@ class BaseForest(BaseEnsemble, SelectorMixin):
         if not hasattr(X, "dtype") or X.dtype != DTYPE or not X.flags.fortan:
             X = np.asarray(X, dtype=DTYPE, order='F')
 
-            y = np.atleast_1d(y)
+        y = np.atleast_1d(y)
 
         if self.bootstrap:
             sample_mask = None
