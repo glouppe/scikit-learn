@@ -43,7 +43,7 @@ from ..externals.joblib import Parallel, delayed, cpu_count
 from ..feature_selection.selector_mixin import SelectorMixin
 from ..tree import DecisionTreeClassifier, DecisionTreeRegressor, \
                    ExtraTreeClassifier, ExtraTreeRegressor
-from ..utils import check_random_state
+from ..utils import array2d, check_random_state
 from ..metrics import r2_score
 from ..tree import _tree
 
@@ -145,6 +145,7 @@ class BaseForest(BaseEnsemble, SelectorMixin):
                        compute_importances=False,
                        oob_score=False,
                        n_jobs=1,
+                       shared=False,
                        random_state=None):
         super(BaseForest, self).__init__(
             base_estimator=base_estimator,
@@ -155,6 +156,7 @@ class BaseForest(BaseEnsemble, SelectorMixin):
         self.compute_importances = compute_importances
         self.oob_score = oob_score
         self.n_jobs = n_jobs
+        self.shared = shared
         self.random_state = check_random_state(random_state)
 
         self.feature_importances_ = None
@@ -177,10 +179,8 @@ class BaseForest(BaseEnsemble, SelectorMixin):
             Returns self.
         """
         # Precompute some data
-        X = np.atleast_2d(X)
-
-        if not hasattr(X, "dtype") or X.dtype != DTYPE or not X.flags.fortan:
-            X = np.asarray(X, dtype=DTYPE, order='F')
+        if not hasattr(X, "dtype") or X.dtype != DTYPE or X.ndim != 2 or not X.flags.fortan:
+            X = array2d(X, dtype=DTYPE, order="F")
 
         y = np.atleast_1d(y)
 
@@ -205,18 +205,19 @@ class BaseForest(BaseEnsemble, SelectorMixin):
         y = np.ascontiguousarray(y, dtype=DTYPE)
 
         # Pack inputs into shared-memory arrays
-        _X = shm.zeros(X.shape, X.dtype, "F")
-        _X[:] = X[:]
-        X = _X
+        if self.shared:
+            _X = shm.zeros(X.shape, X.dtype, "F")
+            _X[:] = X[:]
+            X = _X
 
-        _y = shm.zeros(y.shape, y.dtype)
-        _y[:] = y[:]
-        y = _y
+            _y = shm.zeros(y.shape, y.dtype)
+            _y[:] = y[:]
+            y = _y
 
-        if X_argsorted is not None:
-            _X_argsorted = shm.zeros(X_argsorted.shape, X_argsorted.dtype, "F")
-            _X_argsorted[:] = X_argsorted[:]
-            X_argsorted = _X_argsorted
+            if X_argsorted is not None:
+                _X_argsorted = shm.zeros(X_argsorted.shape, X_argsorted.dtype, "F")
+                _X_argsorted[:] = X_argsorted[:]
+                X_argsorted = _X_argsorted
 
         # Assign chunk of trees to jobs
         n_jobs, n_trees, _ = _partition_trees(self)
@@ -336,11 +337,13 @@ class ForestClassifier(BaseForest, ClassifierMixin):
             ordered by arithmetical order.
         """
         # Check data
-        X = np.atleast_2d(X)
+        if not hasattr(X, "dtype") or X.dtype != DTYPE or X.ndim != 2:
+            X = array2d(X, dtype=DTYPE)
 
-        _X = shm.zeros(X.shape, X.dtype)
-        _X[:] = X[:]
-        X = _X
+        if self.shared:
+            _X = shm.zeros(X.shape, X.dtype)
+            _X[:] = X[:]
+            X = _X
 
         # Assign chunk of trees to jobs
         n_jobs, n_trees, starts = _partition_trees(self)
@@ -418,11 +421,13 @@ class ForestRegressor(BaseForest, RegressorMixin):
             The predicted values.
         """
         # Check data
-        X = np.atleast_2d(X)
+        if not hasattr(X, "dtype") or X.dtype != DTYPE or X.ndim != 2:
+            X = array2d(X, dtype=DTYPE)
 
-        _X = shm.zeros(X.shape, X.dtype)
-        _X[:] = X[:]
-        X = _X
+        if self.shared:
+            _X = shm.zeros(X.shape, X.dtype)
+            _X[:] = X[:]
+            X = _X
 
         # Assign chunk of trees to jobs
         n_jobs, n_trees, starts = _partition_trees(self)

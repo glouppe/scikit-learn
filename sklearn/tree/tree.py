@@ -346,8 +346,8 @@ def _build_tree(X, y, is_classification, criterion,
                                 depth + 1, node_id, False)
 
     # Launch the construction
-    if not hasattr(X, "dtype") or X.dtype != DTYPE or not X.flags.fortran:
-        X = np.asanyarray(X, dtype=DTYPE, order="F")
+    if not hasattr(X, "dtype") or X.dtype != DTYPE or X.ndim != 2 or not X.flags.fortran:
+        X = array2d(X, dtype=DTYPE, order="F")
 
     if not hasattr(y, "dtype") or y.dtype != DTYPE or not y.flags.contiguous:
         y = np.ascontiguousarray(y, dtype=DTYPE)
@@ -414,12 +414,12 @@ class BaseDecisionTree(BaseEstimator, SelectorMixin):
             Returns self.
         """
         # set min_samples_split sensibly
-        self.min_samples_split = max(self.min_samples_split, 2 *
-                self.min_samples_leaf)
+        self.min_samples_split = max(self.min_samples_split,
+                                     2 * self.min_samples_leaf)
 
         # Convert data
-        if not hasattr(X, "dtype") or X.dtype != DTYPE or not X.flags.fortran:
-            X = np.asarray(X, dtype=DTYPE, order='F')
+        if not hasattr(X, "dtype") or X.dtype != DTYPE or X.ndim != 2 or not X.flags.fortran:
+            X = array2d(X, dtype=DTYPE, order="F")
 
         n_samples, self.n_features_ = X.shape
 
@@ -526,7 +526,9 @@ class BaseDecisionTree(BaseEstimator, SelectorMixin):
         y : array of shape = [n_samples]
             The predicted classes, or the predict values.
         """
-        X = array2d(X, dtype=DTYPE)
+        if not hasattr(X, "dtype") or X.dtype != DTYPE or X.ndim != 2:
+            X = array2d(X, dtype=DTYPE)
+
         n_samples, n_features = X.shape
 
         if self.tree_ is None:
