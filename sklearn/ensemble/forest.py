@@ -289,6 +289,7 @@ class ForestClassifier(BaseForest, ClassifierMixin):
                        compute_importances=False,
                        oob_score=False,
                        n_jobs=1,
+                       shared=False,
                        random_state=None):
         super(ForestClassifier, self).__init__(
             base_estimator,
@@ -298,6 +299,7 @@ class ForestClassifier(BaseForest, ClassifierMixin):
             compute_importances=compute_importances,
             oob_score=oob_score,
             n_jobs=n_jobs,
+            shared=shared,
             random_state=random_state)
 
     def predict(self, X):
@@ -393,6 +395,7 @@ class ForestRegressor(BaseForest, RegressorMixin):
                        compute_importances=False,
                        oob_score=False,
                        n_jobs=1,
+                       shared=False,
                        random_state=None):
         super(ForestRegressor, self).__init__(
             base_estimator,
@@ -402,6 +405,7 @@ class ForestRegressor(BaseForest, RegressorMixin):
             compute_importances=compute_importances,
             oob_score=oob_score,
             n_jobs=n_jobs,
+            shared=shared,
             random_state=random_state)
 
     def predict(self, X):
@@ -554,6 +558,7 @@ class RandomForestClassifier(ForestClassifier):
                        compute_importances=False,
                        oob_score=False,
                        n_jobs=1,
+                       shared=False,
                        random_state=None):
         super(RandomForestClassifier, self).__init__(
             base_estimator=DecisionTreeClassifier(),
@@ -565,6 +570,7 @@ class RandomForestClassifier(ForestClassifier):
             compute_importances=compute_importances,
             oob_score=oob_score,
             n_jobs=n_jobs,
+            shared=shared,
             random_state=random_state)
 
         self.criterion = criterion
@@ -662,8 +668,6 @@ class RandomForestRegressor(ForestRegressor):
     `oob_prediction_` : array, shape = [n_samples]
         Prediction computed with out-of-bag estimate on the training set.
 
-
-
     Notes
     -----
     **References**:
@@ -685,6 +689,7 @@ class RandomForestRegressor(ForestRegressor):
                        compute_importances=False,
                        oob_score=False,
                        n_jobs=1,
+                       shared=False,
                        random_state=None):
         super(RandomForestRegressor, self).__init__(
             base_estimator=DecisionTreeRegressor(),
@@ -696,6 +701,7 @@ class RandomForestRegressor(ForestRegressor):
             compute_importances=compute_importances,
             oob_score=oob_score,
             n_jobs=n_jobs,
+            shared=shared,
             random_state=random_state)
 
         self.criterion = criterion
@@ -819,6 +825,7 @@ class ExtraTreesClassifier(ForestClassifier):
                        compute_importances=False,
                        oob_score=False,
                        n_jobs=1,
+                       shared=False,
                        random_state=None):
         super(ExtraTreesClassifier, self).__init__(
             base_estimator=ExtraTreeClassifier(),
@@ -830,6 +837,7 @@ class ExtraTreesClassifier(ForestClassifier):
             compute_importances=compute_importances,
             oob_score=oob_score,
             n_jobs=n_jobs,
+            shared=shared,
             random_state=random_state)
 
         self.criterion = criterion
@@ -952,6 +960,7 @@ class ExtraTreesRegressor(ForestRegressor):
                        compute_importances=False,
                        oob_score=False,
                        n_jobs=1,
+                       shared=False,
                        random_state=None):
         super(ExtraTreesRegressor, self).__init__(
             base_estimator=ExtraTreeRegressor(),
@@ -963,6 +972,7 @@ class ExtraTreesRegressor(ForestRegressor):
             compute_importances=compute_importances,
             oob_score=oob_score,
             n_jobs=n_jobs,
+            shared=shared,
             random_state=random_state)
 
         self.criterion = criterion
