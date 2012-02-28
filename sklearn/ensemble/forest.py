@@ -179,7 +179,7 @@ class BaseForest(BaseEnsemble, SelectorMixin):
             Returns self.
         """
         # Precompute some data
-        if not hasattr(X, "dtype") or X.dtype != DTYPE or X.ndim != 2 or not X.flags.fortan:
+        if not hasattr(X, "dtype") or X.dtype != DTYPE or X.ndim != 2 or not X.flags.fortran:
             X = array2d(X, dtype=DTYPE, order="F")
 
         y = np.atleast_1d(y)
