@@ -95,8 +95,20 @@ def fit_grid_point(X, y, base_clf, clf_params, train, test, loss_func,
             ind = np.arange(X.shape[0])
             train = ind[train]
             test = ind[test]
-        X_train = X[train]
-        X_test = X[test]
+        if hasattr(base_clf, 'kernel_function'):
+            # cannot compute the kernel values with custom function
+            raise ValueError(
+                "Cannot use a custom kernel function. "
+                "Precompute the kernel matrix instead.")
+        if getattr(base_clf, 'kernel', '') == 'precomputed':
+            # X is a precomputed square kernel matrix
+            if X.shape[0] != X.shape[1]:
+                raise ValueError("X should be a square kernel matrix")
+            X_train = X[np.ix_(train, train)]
+            X_test = X[np.ix_(test, train)]
+        else:
+            X_train = X[train]
+            X_test = X[test]
     if y is not None:
         y_test = y[test]
         y_train = y[train]
@@ -133,6 +145,35 @@ def fit_grid_point(X, y, base_clf, clf_params, train, test, loss_func,
                                                        start_time))
         print "[GridSearchCV] %s %s" % ((64 - len(end_msg)) * '.', end_msg)
     return this_score, clf, this_n_test_samples
+
+
+def _check_param_grid(param_grid):
+    if hasattr(param_grid, 'items'):
+        param_grid = [param_grid]
+
+    for p in param_grid:
+        for v in p.itervalues():
+            if isinstance(v, np.ndarray) and v.ndim > 1:
+                raise ValueError("Parameter array should be one-dimensional.")
+
+            check = [isinstance(v, k) for k in (list, tuple, np.ndarray)]
+            if not True in check:
+                raise ValueError("Parameter values should be a list.")
+
+            if len(v) == 0:
+                raise ValueError("Parameter values should be a non-empty list.")
+
+
+def _has_one_grid_point(param_grid):
+    if hasattr(param_grid, 'items'):
+        param_grid = [param_grid]
+
+    for p in param_grid:
+        for v in p.itervalues():
+            if len(v) > 1:
+                return False
+
+    return True
 
 
 class GridSearchCV(BaseEstimator):
@@ -212,7 +253,7 @@ class GridSearchCV(BaseEstimator):
     >>> clf.fit(iris.data, iris.target)
     ...                             # doctest: +NORMALIZE_WHITESPACE +ELLIPSIS
     GridSearchCV(cv=None,
-        estimator=SVC(C=1.0, cache_size=..., coef0=..., degree=...,
+        estimator=SVC(C=None, cache_size=..., coef0=..., degree=...,
             gamma=..., kernel='rbf', probability=False,
             scale_C=True, shrinking=True, tol=...),
         fit_params={}, iid=True, loss_func=None, n_jobs=1,
@@ -276,6 +317,8 @@ class GridSearchCV(BaseEstimator):
                     "should have a 'score' method. The estimator %s "
                     "does not." % estimator)
 
+        _check_param_grid(param_grid)
+
         self.estimator = estimator
         self.param_grid = param_grid
         self.loss_func = loss_func
@@ -287,6 +330,12 @@ class GridSearchCV(BaseEstimator):
         self.cv = cv
         self.verbose = verbose
         self.pre_dispatch = pre_dispatch
+
+    def _set_methods(self):
+        if hasattr(self.best_estimator_, 'predict'):
+            self.predict = self.best_estimator_.predict
+        if hasattr(self.best_estimator_, 'predict_proba'):
+            self.predict_proba = self.best_estimator_.predict_proba
 
     def fit(self, X, y=None, **params):
         """Run fit with all sets of parameters
@@ -308,6 +357,7 @@ class GridSearchCV(BaseEstimator):
         self._set_params(**params)
         estimator = self.estimator
         cv = self.cv
+
         if hasattr(X, 'shape'):
             n_samples = X.shape[0]
         else:
@@ -324,6 +374,16 @@ class GridSearchCV(BaseEstimator):
 
         grid = IterGrid(self.param_grid)
         base_clf = clone(self.estimator)
+
+        # Return early if there is only one grid point.
+        if _has_one_grid_point(self.param_grid):
+            params = iter(grid).next()
+            base_clf.set_params(**params)
+            base_clf.fit(X, y)
+            self.best_estimator_ = base_clf
+            self._set_methods()
+            return self
+
         pre_dispatch = self.pre_dispatch
         out = Parallel(n_jobs=self.n_jobs, verbose=self.verbose,
                 pre_dispatch=pre_dispatch)(
@@ -376,10 +436,7 @@ class GridSearchCV(BaseEstimator):
             best_estimator.fit(X, y, **self.fit_params)
 
         self.best_estimator_ = best_estimator
-        if hasattr(best_estimator, 'predict'):
-            self.predict = best_estimator.predict
-        if hasattr(best_estimator, 'predict_proba'):
-            self.predict_proba = best_estimator.predict_proba
+        self._set_methods()
 
         # Store the computed scores
         # XXX: the name is too specific, it shouldn't have

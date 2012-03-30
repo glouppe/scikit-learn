@@ -268,7 +268,7 @@ def test_decision_function():
 
     """
     # multi class:
-    clf = svm.SVC(kernel='linear').fit(iris.data, iris.target)
+    clf = svm.SVC(kernel='linear', C=1.).fit(iris.data, iris.target)
 
     dec = np.dot(iris.data, clf.coef_.T) + clf.intercept_
 
@@ -279,20 +279,19 @@ def test_decision_function():
     dec = np.dot(X, clf.coef_.T) + clf.intercept_
     prediction = clf.predict(X)
     assert_array_almost_equal(dec, clf.decision_function(X))
-    assert_array_almost_equal(prediction, clf.label_[(clf.decision_function(X) >
-        0).astype(np.int).ravel()])
-    expected = np.array([[-1.        ], [-0.66666667], [-1.        ],
-        [ 0.66666667], [ 1.        ], [ 1.        ]])
-    assert_array_almost_equal(clf.decision_function(X), expected)
+    assert_array_almost_equal(prediction, clf.label_[(clf.decision_function(X)
+        > 0).astype(np.int).ravel()])
+    expected = np.array([[-1.], [-0.66], [-1.], [0.66], [1.], [1.]])
+    assert_array_almost_equal(clf.decision_function(X), expected, 2)
 
 
 def test_weight():
     """
     Test class weights
     """
-    clf = svm.SVC(C=len(X))
+    clf = svm.SVC(class_weight={1: 0.1}, C=len(X))
     # we give a small weights to class 1
-    clf.fit(X, Y, {1: 0.1})
+    clf.fit(X, Y)
     # so all predicted values belong to class 2
     assert_array_almost_equal(clf.predict(X), [2] * 6)
 
@@ -301,7 +300,8 @@ def test_weight():
 
     for clf in (linear_model.LogisticRegression(C=180),
             svm.LinearSVC(C=len(X)), svm.SVC(C=len(X))):
-        clf.fit(X_[: 180], y_[: 180], class_weight={0: 5})
+        clf.set_params(class_weight={0: 5})
+        clf.fit(X_[: 180], y_[: 180])
         y_pred = clf.predict(X_[180:])
         assert_true(np.sum(y_pred == y_[180:]) >= 11)
 
@@ -336,12 +336,11 @@ def test_auto_weight():
     for clf in (svm.SVC(kernel='linear', C=C),
             svm.LinearSVC(C=C), LogisticRegression(C=C)):
         # check that score is better when class='auto' is set.
-        y_pred = clf.fit(X[unbalanced], y[unbalanced],
-                         class_weight={}).predict(X)
-        y_pred_balanced = clf.fit(X[unbalanced], y[unbalanced],
-                                  class_weight='auto').predict(X)
+        y_pred = clf.fit(X[unbalanced], y[unbalanced]).predict(X)
+        clf.set_params(class_weight='auto')
+        y_pred_balanced = clf.fit(X[unbalanced], y[unbalanced],).predict(X)
         assert_true(metrics.f1_score(y, y_pred) <=
-                    metrics.f1_score(y, y_pred_balanced))
+                metrics.f1_score(y, y_pred_balanced))
 
 
 def test_bad_input():
@@ -433,6 +432,26 @@ def test_LinearSVC():
     dec = clf.decision_function(T).ravel()
     res = (dec > 0).astype(np.int) + 1
     assert_array_equal(res, true_result)
+
+
+def test_LinearSVC_crammer_singer():
+    """Test LinearSVC with crammer_singer multi-class svm"""
+    ovr_clf = svm.LinearSVC(C=len(iris.data)).fit(iris.data, iris.target)
+    cs_clf = svm.LinearSVC(C=len(iris.data), multi_class='crammer_singer')
+    cs_clf.fit(iris.data, iris.target)
+
+    # similar prediction for ovr and crammer-singer:
+    assert_true((ovr_clf.predict(iris.data) ==
+        cs_clf.predict(iris.data)).mean() > .9)
+
+    # classifiers shouldn't be the same
+    assert_true((ovr_clf.coef_ != cs_clf.coef_).all())
+
+    # test decision function
+    assert_array_equal(cs_clf.predict(iris.data),
+            np.argmax(cs_clf.decision_function(iris.data), axis=1))
+    dec_func = np.dot(iris.data, cs_clf.coef_.T) + cs_clf.intercept_
+    assert_array_almost_equal(dec_func, cs_clf.decision_function(iris.data))
 
 
 def test_LinearSVC_iris():
@@ -547,21 +566,37 @@ def test_c_samples_scaling():
             svm.SVR(tol=1e-6, kernel='linear', C=100),
             svm.LinearSVC(tol=1e-6, C=0.1),
             linear_model.LogisticRegression(penalty='l1', tol=1e-6, C=100),
-            linear_model.LogisticRegression(penalty='l2', tol=1e-6),
-            svm.NuSVR(tol=1e-6, kernel='linear')]
+            linear_model.LogisticRegression(penalty='l2', tol=1e-6, C=1.),
+            svm.NuSVR(tol=1e-6, kernel='linear', C=1.)]
 
     for clf in clfs:
         clf.set_params(scale_C=False)
         coef_ = clf.fit(X, y).coef_
+        assert_true(clf.C == clf.scaled_C_)
         coef2_ = clf.fit(X2, y2).coef_
         error_no_scale = linalg.norm(coef2_ - coef_) / linalg.norm(coef_)
         assert_true(error_no_scale > 1e-3)
 
         clf.set_params(scale_C=True)
         coef_ = clf.fit(X, y).coef_
+        assert_true(clf.C == clf.scaled_C_ * X.shape[0])
         coef2_ = clf.fit(X2, y2).coef_
         error_with_scale = linalg.norm(coef2_ - coef_) / linalg.norm(coef_)
         assert_true(error_with_scale < 1e-5)
+
+
+def test_c_samples_scaling_default():
+    """Test C scaling : (C=1, scale_C=False) == (C=None, scale_C=True)
+    """
+    X = iris.data[iris.target != 2]
+    y = iris.target[iris.target != 2]
+
+    clf = svm.SVC(tol=1e-6, kernel='linear')
+    clf2 = svm.SVC(tol=1e-6, kernel='linear', C=1., scale_C=False)
+
+    coef_ = clf.fit(X, y).coef_
+    coef2_ = clf2.fit(X, y).coef_
+    assert_array_almost_equal(coef_, coef2_, 7)
 
 
 def test_nu_svc_samples_scaling():

@@ -2,7 +2,7 @@ import numpy as np
 import scipy.sparse as sp
 from nose.tools import assert_true
 from numpy.testing import assert_almost_equal, assert_array_almost_equal, \
-                          assert_equal
+                          assert_equal, assert_array_equal
 from sklearn import datasets
 from sklearn.metrics import mean_squared_error
 
@@ -68,6 +68,48 @@ def test_ridge():
     assert_true(ridge.score(X, y) > 0.9)
 
 
+def test_ridge_shapes():
+    """Test shape of coef_ and intercept_
+    """
+    n_samples, n_features = 5, 10
+    X = np.random.randn(n_samples, n_features)
+    y = np.random.randn(n_samples)
+    Y1 = y[:, np.newaxis]
+    Y = np.c_[y, 1 + y]
+
+    ridge = Ridge()
+
+    ridge.fit(X, y)
+    assert_equal(ridge.coef_.shape, (n_features,))
+    assert_equal(ridge.intercept_.shape, ())
+
+    ridge.fit(X, Y1)
+    assert_equal(ridge.coef_.shape, (1, n_features))
+    assert_equal(ridge.intercept_.shape, (1, ))
+
+    ridge.fit(X, Y)
+    assert_equal(ridge.coef_.shape, (2, n_features))
+    assert_equal(ridge.intercept_.shape, (2, ))
+
+
+def test_ridge_intercept():
+    """Test intercept with multiple targets GH issue #708
+    """
+    n_samples, n_features = 5, 10
+    X = np.random.randn(n_samples, n_features)
+    y = np.random.randn(n_samples)
+    Y = np.c_[y, 1. + y]
+
+    ridge = Ridge()
+
+    ridge.fit(X, y)
+    intercept = ridge.intercept_
+
+    ridge.fit(X, Y)
+    assert_almost_equal(ridge.intercept_[0], intercept)
+    assert_almost_equal(ridge.intercept_[1], intercept + 1.)
+
+
 def test_toy_ridge_object():
     """Test BayesianRegression ridge classifier
 
@@ -123,9 +165,9 @@ def _test_ridge_loo(filter_):
     ridge = Ridge(fit_intercept=False)
 
     # generalized cross-validation (efficient leave-one-out)
-    K, v, Q = ridge_gcv._pre_compute(X_diabetes, y_diabetes)
-    errors, c = ridge_gcv._errors(v, Q, y_diabetes, 1.0)
-    values, c = ridge_gcv._values(K, v, Q, y_diabetes, 1.0)
+    decomp = ridge_gcv._pre_compute(X_diabetes, y_diabetes)
+    errors, c = ridge_gcv._errors(1.0, y_diabetes, *decomp)
+    values, c = ridge_gcv._values(1.0, y_diabetes, *decomp)
 
     # brute-force leave-one-out: remove one example at a time
     errors2 = []
@@ -143,6 +185,16 @@ def _test_ridge_loo(filter_):
     # check that efficient and brute-force LOO give same results
     assert_almost_equal(errors, errors2)
     assert_almost_equal(values, values2)
+
+    # generalized cross-validation (efficient leave-one-out,
+    # SVD variation)
+    decomp = ridge_gcv._pre_compute_svd(X_diabetes, y_diabetes)
+    errors3, c = ridge_gcv._errors_svd(1.0, y_diabetes, *decomp)
+    values3, c = ridge_gcv._values_svd(1.0, y_diabetes, *decomp)
+
+    # check that efficient and SVD efficient LOO give same results
+    assert_almost_equal(errors, errors3)
+    assert_almost_equal(values, values3)
 
     # check best alpha
     ridge_gcv.fit(filter_(X_diabetes), y_diabetes)
@@ -256,3 +308,41 @@ def test_dense_sparse():
         # test that the outputs are the same
         if ret_dense != None and ret_sparse != None:
             assert_array_almost_equal(ret_dense, ret_sparse, decimal=3)
+
+def test_class_weights():
+    """
+    Test class weights.
+    """
+    X = np.array([[-1.0, -1.0], [-1.0, 0], [-.8, -1.0],
+                  [1.0, 1.0], [1.0, 0.0]])
+    y = [1, 1, 1, -1, -1]
+
+    clf = RidgeClassifier(class_weight=None)
+    clf.fit(X, y)
+    assert_array_equal(clf.predict([[0.2, -1.0]]), np.array([1]))
+
+    # we give a small weights to class 1
+    clf = RidgeClassifier(class_weight={1: 0.001})
+    clf.fit(X, y)
+
+    # now the hyperplane should rotate clock-wise and
+    # the prediction on this point should shift
+    assert_array_equal(clf.predict([[0.2, -1.0]]), np.array([-1]))
+
+
+def test_class_weights_cv():
+    """
+    Test class weights for cross validated ridge classifier.
+    """
+    X = np.array([[-1.0, -1.0], [-1.0, 0], [-.8, -1.0],
+                  [1.0, 1.0], [1.0, 0.0]])
+    y = [1, 1, 1, -1, -1]
+
+    clf = RidgeClassifierCV(class_weight=None, alphas=[.01, .1, 1])
+    clf.fit(X, y)
+
+    # we give a small weights to class 1
+    clf = RidgeClassifierCV(class_weight={1: 0.001}, alphas=[.01, .1, 1, 10])
+    clf.fit(X, y)
+
+    assert_array_equal(clf.predict([[-.2, 2]]), np.array([-1]))
