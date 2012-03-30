@@ -295,7 +295,7 @@ class ForestClassifier(BaseForest, ClassifierMixin):
                        oob_score=False,
                        n_jobs=1,
                        shared=False,
-                       random_state=None
+                       random_state=None,
                        verbose=0):
         super(ForestClassifier, self).__init__(
             base_estimator,
@@ -306,7 +306,7 @@ class ForestClassifier(BaseForest, ClassifierMixin):
             oob_score=oob_score,
             n_jobs=n_jobs,
             shared=shared,
-            random_state=random_state
+            random_state=random_state,
             verbose=verbose)
 
     def predict(self, X):
@@ -583,7 +583,7 @@ class RandomForestClassifier(ForestClassifier):
             oob_score=oob_score,
             n_jobs=n_jobs,
             shared=shared,
-            random_state=random_state
+            random_state=random_state,
             verbose=verbose)
 
         self.criterion = criterion
@@ -845,7 +845,7 @@ class ExtraTreesClassifier(ForestClassifier):
                        oob_score=False,
                        n_jobs=1,
                        shared=False,
-                       random_state=None
+                       random_state=None,
                        verbose=0):
         super(ExtraTreesClassifier, self).__init__(
             base_estimator=ExtraTreeClassifier(),
