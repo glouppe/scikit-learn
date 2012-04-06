@@ -186,12 +186,12 @@ def inplace_csr_column_scale_max(X, np.ndarray[DOUBLE, ndim=1] maxs=None):
     if maxs is None:
         maxs = np.zeros(n_features, dtype=X.dtype)
 
-    for i in xrange(n_samples):
-        for j in xrange(X_indptr[i], X_indptr[i + 1]):
-            ind = X_indices[j]
+        for i in xrange(n_samples):
+            for j in xrange(X_indptr[i], X_indptr[i + 1]):
+                ind = X_indices[j]
 
-            if X_data[j] > maxs[ind]:
-                maxs[ind] = X_data[j]
+                if X_data[j] > maxs[ind]:
+                    maxs[ind] = X_data[j]
 
     for i in xrange(n_samples):
         for j in xrange(X_indptr[i], X_indptr[i + 1]):
