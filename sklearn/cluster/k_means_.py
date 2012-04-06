@@ -23,7 +23,6 @@ from ..utils import check_arrays
 from ..utils import check_random_state
 from ..utils import atleast2d_or_csr
 from ..utils import as_float_array
-from ..utils import safe_asarray
 from ..externals.joblib import Parallel
 from ..externals.joblib import delayed
 
@@ -548,11 +547,17 @@ def _init_centroids(X, k, init, random_state=None, x_squared_norms=None,
     n_samples = X.shape[0]
 
     if init_size is not None and init_size < n_samples:
+        if init_size < k:
+            raise ValueError(
+                "init_size=%d should be larger than k=%d" % (init_size, k))
         init_indices = random_state.random_integers(
                 0, n_samples - 1, init_size)
         X = X[init_indices]
         x_squared_norms = x_squared_norms[init_indices]
         n_samples = X.shape[0]
+    elif n_samples < k:
+            raise ValueError(
+                "n_samples=%d should be larger than k=%d" % (init_size, k))
 
     if init == 'k-means++':
         centers = k_init(X, k,
@@ -568,7 +573,7 @@ def _init_centroids(X, k, init, random_state=None, x_squared_norms=None,
     else:
         raise ValueError("the init parameter for the k-means should "
             "be 'k-means++' or 'random' or an ndarray, "
-            "'%s' (type '%s') was passed.")
+            "'%s' (type '%s') was passed." % (init, type(init)))
 
     if sp.issparse(centers):
         centers = centers.toarray()
@@ -1011,7 +1016,7 @@ class MiniBatchKMeans(KMeans):
             batch_size = chunk_size
         self.batch_size = batch_size
         self.compute_labels = compute_labels
-        self.init_size = 3 * batch_size if init_size is None else init_size
+        self.init_size = init_size
 
     def fit(self, X, y=None):
         """Compute the centroids on X by chunking it into mini-batches.
@@ -1052,8 +1057,11 @@ class MiniBatchKMeans(KMeans):
         n_iterations = int(self.max_iter * n_batches)
 
         init_size = self.init_size
+        if init_size is None:
+            init_size = 3 * self.batch_size
         if init_size > n_samples:
             init_size = n_samples
+        self.init_size_ = init_size
 
         validation_indices = self.random_state.random_integers(
                 0, n_samples - 1, init_size)
