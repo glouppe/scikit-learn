@@ -35,6 +35,7 @@ The module structure is the following:
 
 import itertools
 import numpy as np
+import sys
 
 import sharedmem as shm
 
@@ -65,8 +66,10 @@ def _parallel_build_trees(n_trees, forest, X, y,
     trees = []
 
     for i in xrange(n_trees):
-        if verbose > 1:
-            print("building tree %d of %d" % (i + 1, n_trees))
+        if verbose > 0:
+            sys.stdout.write(".")
+            sys.stdout.flush()
+
         seed = random_state.randint(MAX_INT)
 
         tree = forest._make_estimator(append=False)
@@ -227,7 +230,7 @@ class BaseForest(BaseEnsemble, SelectorMixin):
         n_jobs, n_trees, _ = _partition_trees(self)
 
         # Parallel loop
-        all_trees = Parallel(n_jobs=n_jobs, verbose=self.verbose)(
+        all_trees = Parallel(n_jobs=n_jobs)(
             delayed(_parallel_build_trees)(
                 n_trees[i],
                 self,
@@ -238,6 +241,9 @@ class BaseForest(BaseEnsemble, SelectorMixin):
                 self.random_state.randint(MAX_INT),
                 verbose=self.verbose)
             for i in xrange(n_jobs))
+
+        if self.verbose:
+            print
 
         # Reduce
         self.estimators_ = [tree for tree in itertools.chain(*all_trees)]
