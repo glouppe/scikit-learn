@@ -33,9 +33,12 @@ The module structure is the following:
 # Authors: Gilles Louppe, Brian Holt
 # License: BSD 3
 
+import cPickle
 import itertools
 import numpy as np
+import os
 import sys
+import tempfile
 
 import sharedmem as shm
 
@@ -59,8 +62,8 @@ MAX_INT = np.iinfo(np.int32).max
 DTYPE = _tree.DTYPE
 
 
-def _parallel_build_trees(n_trees, forest, X, y,
-                          sample_mask, X_argsorted, seed, verbose):
+def _parallel_build_trees(n_trees, forest, X, y, sample_mask,
+                          X_argsorted, seed, tmpdir, verbose):
     """Private function used to build a batch of trees within a job."""
     random_state = check_random_state(seed)
     trees = []
@@ -87,6 +90,12 @@ def _parallel_build_trees(n_trees, forest, X, y,
             tree.fit(X, y,
                      sample_mask=sample_mask, X_argsorted=X_argsorted)
 
+        if tmpdir is not None:
+            fd = tempfile.NamedTemporaryFile(dir=tmpdir, delete=False)
+            cPickle.dump(tree, fd, protocol=cPickle.HIGHEST_PROTOCOL)
+            tree = fd.name
+            fd.close()
+
         trees.append(tree)
 
     return trees
@@ -97,6 +106,11 @@ def _parallel_predict_proba(trees, X, n_classes):
     p = np.zeros((X.shape[0], n_classes))
 
     for tree in trees:
+        if isinstance(tree, basestring):
+            fd = open(tree, "rb")
+            tree = cPickle.load(fd)
+            fd.close()
+
         if n_classes == tree.n_classes_:
             p += tree.predict_proba(X)
 
@@ -176,6 +190,7 @@ class BaseForest(BaseEnsemble, SelectorMixin):
                        oob_score=False,
                        n_jobs=1,
                        shared=False,
+                       tmpdir=None,
                        random_state=None,
                        verbose=0):
         super(BaseForest, self).__init__(
@@ -188,6 +203,7 @@ class BaseForest(BaseEnsemble, SelectorMixin):
         self.oob_score = oob_score
         self.n_jobs = n_jobs
         self.shared = shared
+        self.tmpdir = tmpdir
         self.random_state = check_random_state(random_state)
 
         self.feature_importances_ = None
@@ -271,6 +287,7 @@ class BaseForest(BaseEnsemble, SelectorMixin):
                 sample_mask,
                 X_argsorted,
                 self.random_state.randint(MAX_INT),
+                self.tmpdir,
                 verbose=self.verbose)
             for i in xrange(n_jobs))
 
@@ -318,6 +335,11 @@ class BaseForest(BaseEnsemble, SelectorMixin):
 
         return self
 
+    def __del__(self):
+        if self.tmpdir is not None:
+            for tree in self.estimators_:
+                os.remove(tree)
+
 
 class ForestClassifier(BaseForest, ClassifierMixin):
     """Base class for forest of trees-based classifiers.
@@ -333,6 +355,7 @@ class ForestClassifier(BaseForest, ClassifierMixin):
                        oob_score=False,
                        n_jobs=1,
                        shared=False,
+                       tmpdir=None,
                        random_state=None,
                        verbose=0):
         super(ForestClassifier, self).__init__(
@@ -344,6 +367,7 @@ class ForestClassifier(BaseForest, ClassifierMixin):
             oob_score=oob_score,
             n_jobs=n_jobs,
             shared=shared,
+            tmpdir=tmpdir,
             random_state=random_state,
             verbose=verbose)
 
@@ -441,6 +465,7 @@ class ForestRegressor(BaseForest, RegressorMixin):
                        oob_score=False,
                        n_jobs=1,
                        shared=False,
+                       tmpdir=None,
                        random_state=None,
                        verbose=0):
         super(ForestRegressor, self).__init__(
@@ -452,6 +477,7 @@ class ForestRegressor(BaseForest, RegressorMixin):
             oob_score=oob_score,
             n_jobs=n_jobs,
             shared=shared,
+            tmpdir=tmpdir,
             random_state=random_state,
             verbose=verbose)
 
@@ -608,6 +634,7 @@ class RandomForestClassifier(ForestClassifier):
                        oob_score=False,
                        n_jobs=1,
                        shared=False,
+                       tmpdir=None,
                        random_state=None,
                        verbose=0):
         super(RandomForestClassifier, self).__init__(
@@ -621,6 +648,7 @@ class RandomForestClassifier(ForestClassifier):
             oob_score=oob_score,
             n_jobs=n_jobs,
             shared=shared,
+            tmpdir=tmpdir,
             random_state=random_state,
             verbose=verbose)
 
@@ -743,6 +771,7 @@ class RandomForestRegressor(ForestRegressor):
                        oob_score=False,
                        n_jobs=1,
                        shared=False,
+                       tmpdir=None,
                        random_state=None,
                        verbose=0):
         super(RandomForestRegressor, self).__init__(
@@ -756,6 +785,7 @@ class RandomForestRegressor(ForestRegressor):
             oob_score=oob_score,
             n_jobs=n_jobs,
             shared=shared,
+            tmpdir=tmpdir,
             random_state=random_state,
             verbose=verbose)
 
@@ -883,6 +913,7 @@ class ExtraTreesClassifier(ForestClassifier):
                        oob_score=False,
                        n_jobs=1,
                        shared=False,
+                       tmpdir=None,
                        random_state=None,
                        verbose=0):
         super(ExtraTreesClassifier, self).__init__(
@@ -896,6 +927,7 @@ class ExtraTreesClassifier(ForestClassifier):
             oob_score=oob_score,
             n_jobs=n_jobs,
             shared=shared,
+            tmpdir=tmpdir,
             random_state=random_state,
             verbose=verbose)
 
@@ -1022,6 +1054,7 @@ class ExtraTreesRegressor(ForestRegressor):
                        oob_score=False,
                        n_jobs=1,
                        shared=False,
+                       tmpdir=None,
                        random_state=None,
                        verbose=0):
 
@@ -1036,6 +1069,7 @@ class ExtraTreesRegressor(ForestRegressor):
             oob_score=oob_score,
             n_jobs=n_jobs,
             shared=shared,
+            tmpdir=tmpdir,
             random_state=random_state,
             verbose=verbose)
 

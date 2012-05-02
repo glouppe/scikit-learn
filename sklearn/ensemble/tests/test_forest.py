@@ -224,7 +224,7 @@ def test_gridsearch():
 def test_parallel():
     """Check parallel computations."""
     # Classification
-    forest = RandomForestClassifier(n_estimators=10, n_jobs=3, random_state=0)
+    forest = RandomForestClassifier(n_estimators=10, n_jobs=3, random_state=0, tmpdir="/tmp/")
 
     forest.fit(iris.data, iris.target)
     assert_true(10 == len(forest))
