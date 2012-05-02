@@ -338,7 +338,10 @@ class BaseForest(BaseEnsemble, SelectorMixin):
     def __del__(self):
         if self.tmpdir is not None:
             for tree in self.estimators_:
-                os.remove(tree)
+                try:
+                    os.remove(tree)
+                except:
+                    pass
 
 
 class ForestClassifier(BaseForest, ClassifierMixin):
