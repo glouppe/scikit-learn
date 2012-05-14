@@ -68,16 +68,16 @@ def _parallel_build_trees(n_trees, forest, X, y, sample_mask,
     random_state = check_random_state(seed)
     trees = []
 
-    if tmpdir:
-        fd, shape, dtype, order = X
-        X = np.memmap(filename=fd, mode="r", shape=shape, dtype=dtype, order=order)
+    # if tmpdir:
+    #     fd, shape, dtype, order = X
+    #     X = np.memmap(filename=fd, mode="r", shape=shape, dtype=dtype, order=order)
 
-        fd, shape, dtype = y
-        y = np.memmap(filename=fd, mode="r", shape=shape, dtype=dtype)
+    #     fd, shape, dtype = y
+    #     y = np.memmap(filename=fd, mode="r", shape=shape, dtype=dtype)
 
-        if X_argsorted is not None:
-            fd, shape, dtype, order = X_argsorted
-            X_argsorted = np.memmap(filename=fd, mode="r", shape=shape, dtype=dtype, order=order)
+    #     if X_argsorted is not None:
+    #         fd, shape, dtype, order = X_argsorted
+    #         X_argsorted = np.memmap(filename=fd, mode="r", shape=shape, dtype=dtype, order=order)
 
     for i in xrange(n_trees):
         if verbose > 0:
@@ -101,11 +101,11 @@ def _parallel_build_trees(n_trees, forest, X, y, sample_mask,
             tree.fit(X, y,
                      sample_mask=sample_mask, X_argsorted=X_argsorted)
 
-        if tmpdir is not None:
-            fd = tempfile.NamedTemporaryFile(dir=tmpdir, delete=False)
-            cPickle.dump(tree, fd, protocol=cPickle.HIGHEST_PROTOCOL)
-            tree = fd.name
-            fd.close()
+        # if tmpdir is not None:
+        #     fd = tempfile.NamedTemporaryFile(dir=tmpdir, delete=False)
+        #     cPickle.dump(tree, fd, protocol=cPickle.HIGHEST_PROTOCOL)
+        #     tree = fd.name
+        #     fd.close()
 
         trees.append(tree)
 
@@ -273,30 +273,44 @@ class BaseForest(BaseEnsemble, SelectorMixin):
         y = np.ascontiguousarray(y, dtype=DTYPE)
 
         # Pack inputs into shared-memory arrays
-        if self.tmpdir:
-            self.__fds = []
-
-            fd = tempfile.NamedTemporaryFile(dir=self.tmpdir, delete=False)
-            _X = np.memmap(filename=fd, shape=X.shape, dtype=X.dtype, order="F")
+        if self.shared:
+            _X = shm.zeros(X.shape, X.dtype, "F")
             _X[:] = X[:]
-            self.__fds.append(fd.name)
-            X = (fd.name, X.shape, X.dtype, "F")
-            fd.close()
+            X = _X
 
-            fd = tempfile.NamedTemporaryFile(dir=self.tmpdir, delete=False)
-            _y = np.memmap(filename=fd, shape=y.shape, dtype=y.dtype)
+            _y = shm.zeros(y.shape, y.dtype)
             _y[:] = y[:]
-            self.__fds.append(fd.name)
-            y = (fd.name, y.shape, y.dtype)
-            fd.close()
+            y = _y
 
             if X_argsorted is not None:
-                fd = tempfile.NamedTemporaryFile(dir=self.tmpdir, delete=False)
-                _X_argsorted = np.memmap(filename=fd, shape=X_argsorted.shape, dtype=X_argsorted.dtype, order="F")
+                _X_argsorted = shm.zeros(X_argsorted.shape, X_argsorted.dtype, "F")
                 _X_argsorted[:] = X_argsorted[:]
-                self.__fds.append(fd.name)
-                X_argsorted = (fd.name, X_argsorted.shape, X_argsorted.dtype, "F")
-                fd.close()
+                X_argsorted = _X_argsorted
+
+        # if self.tmpdir:
+        #     self.__fds = []
+
+        #     fd = tempfile.NamedTemporaryFile(dir=self.tmpdir, delete=False)
+        #     _X = np.memmap(filename=fd, shape=X.shape, dtype=X.dtype, order="F")
+        #     _X[:] = X[:]
+        #     self.__fds.append(fd.name)
+        #     X = (fd.name, X.shape, X.dtype, "F")
+        #     fd.close()
+
+        #     fd = tempfile.NamedTemporaryFile(dir=self.tmpdir, delete=False)
+        #     _y = np.memmap(filename=fd, shape=y.shape, dtype=y.dtype)
+        #     _y[:] = y[:]
+        #     self.__fds.append(fd.name)
+        #     y = (fd.name, y.shape, y.dtype)
+        #     fd.close()
+
+        #     if X_argsorted is not None:
+        #         fd = tempfile.NamedTemporaryFile(dir=self.tmpdir, delete=False)
+        #         _X_argsorted = np.memmap(filename=fd, shape=X_argsorted.shape, dtype=X_argsorted.dtype, order="F")
+        #         _X_argsorted[:] = X_argsorted[:]
+        #         self.__fds.append(fd.name)
+        #         X_argsorted = (fd.name, X_argsorted.shape, X_argsorted.dtype, "F")
+        #         fd.close()
 
         # Assign chunk of trees to jobs
         n_jobs, n_trees, _ = _partition_trees(self)
@@ -359,19 +373,19 @@ class BaseForest(BaseEnsemble, SelectorMixin):
 
         return self
 
-    def __del__(self):
-        if self.tmpdir is not None:
-            for tree in self.estimators_:
-                try:
-                    os.remove(tree)
-                except:
-                    pass
+    # def __del__(self):
+    #     if self.tmpdir is not None:
+    #         for tree in self.estimators_:
+    #             try:
+    #                 os.remove(tree)
+    #             except:
+    #                 pass
 
-            for fd in self.__fds:
-                try:
-                    os.remove(fd)
-                except:
-                    pass
+    #         for fd in self.__fds:
+    #             try:
+    #                 os.remove(fd)
+    #             except:
+    #                 pass
 
 
 class ForestClassifier(BaseForest, ClassifierMixin):
