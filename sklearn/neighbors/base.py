@@ -17,10 +17,17 @@ from ..metrics import pairwise_distances
 from ..utils import safe_asarray, atleast2d_or_csr
 
 
+class NeighborsWarning(UserWarning):
+    pass
+
+# Make sure that NeighborsWarning are displayed more than once
+warnings.simplefilter("always", NeighborsWarning)
+
+
 def warn_equidistant():
     msg = ("kneighbors: neighbor k+1 and neighbor k have the same "
            "distance: results will be dependent on data order.")
-    warnings.warn(msg)
+    warnings.warn(msg, NeighborsWarning, stacklevel=3)
 
 
 def _check_weights(weights):
@@ -37,31 +44,29 @@ def _check_weights(weights):
 def _get_weights(dist, weights):
     """Get the weights from an array of distances and a parameter ``weights``
 
-    ``weights`` can be either a string or an executable.
+    Parameters
+    ===========
+    dist: ndarray
+        The input distances
+    weights: {'uniform', 'distance' or a callable}
+        The kind of weighting used
 
-    returns ``weights_arr``, an array of the same size as ``dist``
-    if ``weights == 'uniform'``, then returns None
+    Returns
+    ========
+    weights_arr: array of the same shape as ``dist``
+        if ``weights == 'uniform'``, then returns None
     """
-    if dist.dtype == np.dtype(object):
-        if weights in (None, 'uniform'):
-            return None
-        elif weights == 'distance':
-            return [1. / d for d in dist]
-        elif callable(weights):
-            return [weights(d) for d in dist]
-        else:
-            raise ValueError("weights not recognized: should be 'uniform', "
-                             "'distance', or a callable function")
+    if weights in (None, 'uniform'):
+        return None
+    elif weights == 'distance':
+        with np.errstate(divide='ignore'):
+            dist = 1./dist
+        return dist
+    elif callable(weights):
+        return weights(dist)
     else:
-        if weights in (None, 'uniform'):
-            return None
-        elif weights == 'distance':
-            return 1. / dist
-        elif callable(weights):
-            return weights(dist)
-        else:
-            raise ValueError("weights not recognized: should be 'uniform', "
-                             "'distance', or a callable function")
+        raise ValueError("weights not recognized: should be 'uniform', "
+                            "'distance', or a callable function")
 
 
 class NeighborsBase(BaseEstimator):
@@ -126,7 +131,9 @@ class NeighborsBase(BaseEstimator):
 
         if self._fit_method == 'auto':
             # BallTree outperforms the others in nearly any circumstance.
-            if self.n_neighbors < self._fit_X.shape[0] / 2:
+            if self.n_neighbors is None : 
+                self._fit_method = 'ball_tree'
+            elif self.n_neighbors < self._fit_X.shape[0] // 2:
                 self._fit_method = 'ball_tree'
             else:
                 self._fit_method = 'brute'
@@ -183,7 +190,7 @@ class KNeighborsMixin(object):
         >>> neigh = NearestNeighbors(n_neighbors=1)
         >>> neigh.fit(samples) # doctest: +ELLIPSIS
         NearestNeighbors(algorithm='auto', leaf_size=30, ...)
-        >>> print neigh.kneighbors([1., 1., 1.]) # doctest: +ELLIPSIS
+        >>> print(neigh.kneighbors([1., 1., 1.])) # doctest: +ELLIPSIS
         (array([[ 0.5]]), array([[2]]...))
 
         As you can see, it returns [[0.5]], and [[2]], which means that the
@@ -361,7 +368,7 @@ class RadiusNeighborsMixin(object):
         >>> neigh = NearestNeighbors(radius=1.6)
         >>> neigh.fit(samples) # doctest: +ELLIPSIS
         NearestNeighbors(algorithm='auto', leaf_size=30, ...)
-        >>> print neigh.radius_neighbors([1., 1., 1.]) # doctest: +ELLIPSIS
+        >>> print(neigh.radius_neighbors([1., 1., 1.])) # doctest: +ELLIPSIS
         (array([[ 1.5,  0.5]]...), array([[1, 2]]...)
 
         The first array returned contains the distances to all points which
