@@ -177,29 +177,29 @@ for these classifiers.
 
 This might be made more clear by an example:
 
-    Consider a three class problem with with class 0 having 3 support vectors
-    :math:`v^{0}_0, v^{1}_0, v^{2}_0` and class 1 and 2 having two support
-    vectors :math:`v^{0}_1, v^{1}_1` and :math:`v^{0}_1, v^{1}_1` respectively.
-    For each support vector :math:`v^{j}_i`, there are 2 dual coefficients.
-    Let's call the coefficient of support vector :math:`v^{j}_i` in the
-    classifier between classes `i` and `k` :math:`\alpha^{j}_{i,k}`.
-    Then ``dual_coef_`` looks like this:
+Consider a three class problem with with class 0 having 3 support vectors
+:math:`v^{0}_0, v^{1}_0, v^{2}_0` and class 1 and 2 having two support
+vectors :math:`v^{0}_1, v^{1}_1` and :math:`v^{0}_1, v^{1}_1` respectively.
+For each support vector :math:`v^{j}_i`, there are 2 dual coefficients.
+Let's call the coefficient of support vector :math:`v^{j}_i` in the
+classifier between classes `i` and `k` :math:`\alpha^{j}_{i,k}`.
+Then ``dual_coef_`` looks like this:
 
-    +------------------------+------------------------+------------------+
-    |:math:`\alpha^{0}_{0,1}`|:math:`\alpha^{0}_{0,2}`|Coefficients      |
-    +------------------------+------------------------+                  |
-    |:math:`\alpha^{1}_{0,1}`|:math:`\alpha^{1}_{0,2}`|for SVs           |
-    +------------------------+------------------------+                  |
-    |:math:`\alpha^{2}_{0,1}`|:math:`\alpha^{2}_{0,2}`|of class 0        |
-    +------------------------+------------------------+------------------+
-    |:math:`\alpha^{0}_{1,0}`|:math:`\alpha^{0}_{1,2}`|Coefficients      |
-    +------------------------+------------------------+                  |
-    |:math:`\alpha^{1}_{1,0}`|:math:`\alpha^{1}_{1,2}`|for SVs of class 1|
-    +------------------------+------------------------+------------------+
-    |:math:`\alpha^{0}_{2,0}`|:math:`\alpha^{0}_{2,1}`|Coefficients      |
-    +------------------------+------------------------+                  |
-    |:math:`\alpha^{1}_{2,0}`|:math:`\alpha^{1}_{2,1}`|for SVs of class 2|
-    +------------------------+------------------------+------------------+
++------------------------+------------------------+------------------+
+|:math:`\alpha^{0}_{0,1}`|:math:`\alpha^{0}_{0,2}`|Coefficients      |
++------------------------+------------------------+for SVs of class 0|
+|:math:`\alpha^{1}_{0,1}`|:math:`\alpha^{1}_{0,2}`|                  |
++------------------------+------------------------+                  |
+|:math:`\alpha^{2}_{0,1}`|:math:`\alpha^{2}_{0,2}`|                  |
++------------------------+------------------------+------------------+
+|:math:`\alpha^{0}_{1,0}`|:math:`\alpha^{0}_{1,2}`|Coefficients      |
++------------------------+------------------------+for SVs of class 1|
+|:math:`\alpha^{1}_{1,0}`|:math:`\alpha^{1}_{1,2}`|                  |
++------------------------+------------------------+------------------+
+|:math:`\alpha^{0}_{2,0}`|:math:`\alpha^{0}_{2,1}`|Coefficients      |
++------------------------+------------------------+for SVs of class 2|
+|:math:`\alpha^{1}_{2,0}`|:math:`\alpha^{1}_{2,1}`|                  |
++------------------------+------------------------+------------------+
 
 
 Unbalanced problems
@@ -352,10 +352,9 @@ Tips on Practical Use
     set `cache_size` to a higher value than the default of 200(MB),
     such as 500(MB) or 1000(MB).
 
-  * **Setting C**: In constrast to the scaling in LibSVM and LibLinear,
-    the ``C`` parameter in `sklearn.svm` is a per sample penalty.
-    Commonly good values for ``C`` often are very large (i.e. ``10**4``)
-    and seldom below ``1``.
+  * **Setting C**: C is ``1`` by default and it's a reasonable default choice.
+    If you have a lot of noisy observations you should decrease it.
+    It corresponds to regularize more the estimation.
 
   * Support Vector Machine algorithms are not scale invariant, so **it
     is highly recommended to scale your data**. For example, scale each
