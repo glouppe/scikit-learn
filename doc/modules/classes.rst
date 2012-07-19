@@ -158,6 +158,7 @@ Loaders
    datasets.load_lfw_people
    datasets.fetch_lfw_people
    datasets.load_linnerud
+   datasets.fetch_mldata
    datasets.fetch_olivetti_faces
    datasets.load_sample_image
    datasets.load_sample_images
@@ -560,8 +561,8 @@ For sparse data
    :toctree: generated/
    :template: class.rst
 
-   linear_model.sparse.Lasso
-   linear_model.sparse.ElasticNet
+   linear_model.Lasso
+   linear_model.ElasticNet
    linear_model.sparse.SGDClassifier
    linear_model.sparse.SGDRegressor
    linear_model.LogisticRegression

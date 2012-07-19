@@ -17,6 +17,7 @@ from scipy import linalg, interpolate
 from scipy.linalg.lapack import get_lapack_funcs
 
 from .base import LinearModel
+from ..base import RegressorMixin
 from ..utils import array2d, arrayfuncs, deprecated
 from ..cross_validation import check_cv
 from ..externals.joblib import Parallel, delayed
@@ -138,6 +139,7 @@ def lars_path(X, y, Xy=None, Gram=None, max_iter=500,
             sys.stdout.flush()
 
     tiny = np.finfo(np.float).tiny  # to avoid division by 0 warning
+    tiny32 = np.finfo(np.float32).tiny  # to avoid division by 0 warning
 
     while True:
         if Cov.size:
@@ -213,6 +215,18 @@ def lars_path(X, y, Xy=None, Gram=None, max_iter=500,
 
         # is this really needed ?
         AA = 1. / np.sqrt(np.sum(least_squares * sign_active[:n_active]))
+
+        if not np.isfinite(AA):
+            # L is too ill-conditionned
+            i = 0
+            L_ = L[:n_active, :n_active].copy()
+            while not np.isfinite(AA):
+                L_.flat[::n_active + 1] += (2 ** i) * eps
+                least_squares, info = solve_cholesky(L_,
+                                    sign_active[:n_active], lower=True)
+                AA = 1. / np.sqrt(np.sum(least_squares
+                                         * sign_active[:n_active]))
+                i += 1
         least_squares *= AA
 
         if Gram is None:
@@ -234,7 +248,7 @@ def lars_path(X, y, Xy=None, Gram=None, max_iter=500,
 
         # TODO: better names for these variables: z
         drop = False
-        z = -coefs[n_iter, active] / least_squares
+        z = -coefs[n_iter, active] / (least_squares + tiny32)
         z_pos = arrayfuncs.min_pos(z)
         if z_pos < gamma_:
             # some coefficients have changed sign
@@ -318,7 +332,7 @@ def lars_path(X, y, Xy=None, Gram=None, max_iter=500,
 ###############################################################################
 # Estimator classes
 
-class Lars(LinearModel):
+class Lars(LinearModel, RegressorMixin):
     """Least Angle Regression model a.k.a. LAR
 
     Parameters
@@ -637,7 +651,7 @@ def _lars_path_residues(X_train, y_train, X_test, y_test, Gram=None,
     return alphas, active, coefs, residues
 
 
-class LarsCV(LARS):
+class LarsCV(Lars):
     """Cross-validated Least Angle Regression model
 
     Parameters
@@ -784,7 +798,7 @@ class LarsCV(LARS):
         self.cv_mse_path_ = mse_path
 
         # Now compute the full model
-        LARS.fit(self, X, y)
+        Lars.fit(self, X, y)
         return self
 
 

@@ -18,6 +18,7 @@ libsvm command line programs.
 from bz2 import BZ2File
 from contextlib import closing
 import gzip
+import io
 import os.path
 
 import numpy as np
@@ -53,8 +54,11 @@ def load_svmlight_file(f, n_features=None, dtype=np.float64,
 
     Parameters
     ----------
-    f: str or file-like open in binary mode.
-        (Path to) a file to load.
+    f: {str, file-like, int}
+        (Path to) a file to load. If a path ends in ".gz" or ".bz2", it will
+        be uncompressed on the fly. If an integer is passed, it is assumed to
+        be a file descriptor. A file-like or file descriptor will not be closed
+        by this function. A file-like object must be opened in binary mode.
 
     n_features: int or None
         The number of features to use. If None, it will be inferred. This
@@ -92,8 +96,8 @@ def load_svmlight_file(f, n_features=None, dtype=np.float64,
 
 
 def _gen_open(f):
-    if isinstance(f, int):  # file descriptor, supported in Python 3
-        return open(f, "rb")
+    if isinstance(f, int):  # file descriptor
+        return io.open(f, "rb", closefd=False)
     elif not isinstance(f, basestring):
         raise TypeError("expected {str, int, file-like}, got %s" % type(f))
 
@@ -125,9 +129,12 @@ def load_svmlight_files(files, n_features=None, dtype=np.float64,
 
     Parameters
     ----------
-    files : iterable over {str, file-like}
+    files : iterable over {str, file-like, int}
         (Paths of) files to load. If a path ends in ".gz" or ".bz2", it will
-        be uncompressed on the fly.
+        be uncompressed on the fly. If an integer is passed, it is assumed to
+        be a file descriptor. File-likes and file descriptors will not be
+        closed by this function. File-like objects must be opened in binary
+        mode.
 
     n_features: int or None
         The number of features to use. If None, it will be inferred from the
@@ -188,10 +195,20 @@ def _dump_svmlight(X, y, f, zero_based):
     is_sp = int(hasattr(X, "tocsr"))
 
     one_based = not zero_based
+    if X.dtype == np.float64:
+        value_pattern = u"%d:%0.16e"
+    else:
+        value_pattern = u"%d:%f"
+
+    if y.dtype.kind == 'i':
+        line_pattern = u"%d %s\n"
+    else:
+        line_pattern = u"%f %s\n"
+
     for i in xrange(X.shape[0]):
-        s = u" ".join([u"%d:%f" % (j + one_based, X[i, j])
+        s = u" ".join([value_pattern % (j + one_based, X[i, j])
                        for j in X[i].nonzero()[is_sp]])
-        f.write((u"%f %s\n" % (y[i], s)).encode('ascii'))
+        f.write((line_pattern % (y[i], s)).encode('ascii'))
 
 
 def dump_svmlight_file(X, y, f, zero_based=True):
