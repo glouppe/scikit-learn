@@ -43,6 +43,8 @@ import numpy as np
 from warnings import warn
 from abc import ABCMeta, abstractmethod
 
+import sharedmem as shm
+
 from ..base import ClassifierMixin, RegressorMixin
 from ..externals.joblib import Parallel, delayed, cpu_count
 from ..externals import six
@@ -189,6 +191,7 @@ class BaseForest(six.with_metaclass(ABCMeta, BaseEnsemble,
                  bootstrap=False,
                  oob_score=False,
                  n_jobs=1,
+                 shared=False,
                  random_state=None,
                  verbose=0):
         super(BaseForest, self).__init__(
@@ -199,6 +202,7 @@ class BaseForest(six.with_metaclass(ABCMeta, BaseEnsemble,
         self.bootstrap = bootstrap
         self.oob_score = oob_score
         self.n_jobs = n_jobs
+        self.shared = shared
         self.random_state = random_state
 
         self.n_features_ = None
@@ -298,6 +302,16 @@ class BaseForest(six.with_metaclass(ABCMeta, BaseEnsemble,
 
         if getattr(y, "dtype", None) != DOUBLE or not y.flags.contiguous:
             y = np.ascontiguousarray(y, dtype=DOUBLE)
+
+        # Pack inputs into shared-memory arrays
+        if self.shared:
+            _X = shm.zeros(X.shape, X.dtype)
+            _X[:] = X[:]
+            X = _X
+
+            _y = shm.zeros(y.shape, y.dtype)
+            _y[:] = y[:]
+            y = _y
 
         # Assign chunk of trees to jobs
         n_jobs, n_trees, _ = _partition_trees(self)
@@ -441,6 +455,7 @@ class ForestClassifier(six.with_metaclass(ABCMeta, BaseForest,
                  bootstrap=False,
                  oob_score=False,
                  n_jobs=1,
+                 shared=False,
                  random_state=None,
                  verbose=0):
 
@@ -451,6 +466,7 @@ class ForestClassifier(six.with_metaclass(ABCMeta, BaseForest,
             bootstrap=bootstrap,
             oob_score=oob_score,
             n_jobs=n_jobs,
+            shared=shared,
             random_state=random_state,
             verbose=verbose)
 
@@ -507,6 +523,11 @@ class ForestClassifier(six.with_metaclass(ABCMeta, BaseForest,
         # Check data
         if getattr(X, "dtype", None) != DTYPE or X.ndim != 2:
             X = array2d(X, dtype=DTYPE)
+
+        if self.shared:
+            _X = shm.zeros(X.shape, X.dtype)
+            _X[:] = X[:]
+            X = _X
 
         # Assign chunk of trees to jobs
         n_jobs, n_trees, starts = _partition_trees(self)
@@ -584,6 +605,7 @@ class ForestRegressor(six.with_metaclass(ABCMeta, BaseForest, RegressorMixin)):
                  bootstrap=False,
                  oob_score=False,
                  n_jobs=1,
+                 shared=False,
                  random_state=None,
                  verbose=0):
         super(ForestRegressor, self).__init__(
@@ -593,6 +615,7 @@ class ForestRegressor(six.with_metaclass(ABCMeta, BaseForest, RegressorMixin)):
             bootstrap=bootstrap,
             oob_score=oob_score,
             n_jobs=n_jobs,
+            shared=shared,
             random_state=random_state,
             verbose=verbose)
 
@@ -615,6 +638,11 @@ class ForestRegressor(six.with_metaclass(ABCMeta, BaseForest, RegressorMixin)):
         # Check data
         if getattr(X, "dtype", None) != DTYPE or X.ndim != 2:
             X = array2d(X, dtype=DTYPE)
+
+        if self.shared:
+            _X = shm.zeros(X.shape, X.dtype)
+            _X[:] = X[:]
+            X = _X
 
         # Assign chunk of trees to jobs
         n_jobs, n_trees, starts = _partition_trees(self)
@@ -741,6 +769,7 @@ class RandomForestClassifier(ForestClassifier):
                  bootstrap=True,
                  oob_score=False,
                  n_jobs=1,
+                 shared=False,
                  random_state=None,
                  verbose=0,
                  min_density=None,
@@ -754,6 +783,7 @@ class RandomForestClassifier(ForestClassifier):
             bootstrap=bootstrap,
             oob_score=oob_score,
             n_jobs=n_jobs,
+            shared=shared,
             random_state=random_state,
             verbose=verbose)
 
@@ -874,6 +904,7 @@ class RandomForestRegressor(ForestRegressor):
                  bootstrap=True,
                  oob_score=False,
                  n_jobs=1,
+                 shared=False,
                  random_state=None,
                  verbose=0,
                  min_density=None,
@@ -887,6 +918,7 @@ class RandomForestRegressor(ForestRegressor):
             bootstrap=bootstrap,
             oob_score=oob_score,
             n_jobs=n_jobs,
+            shared=shared,
             random_state=random_state,
             verbose=verbose)
 
@@ -1022,6 +1054,7 @@ class ExtraTreesClassifier(ForestClassifier):
                  bootstrap=False,
                  oob_score=False,
                  n_jobs=1,
+                 shared=False,
                  random_state=None,
                  verbose=0,
                  min_density=None,
@@ -1035,6 +1068,7 @@ class ExtraTreesClassifier(ForestClassifier):
             bootstrap=bootstrap,
             oob_score=oob_score,
             n_jobs=n_jobs,
+            shared=shared,
             random_state=random_state,
             verbose=verbose)
 
@@ -1159,6 +1193,7 @@ class ExtraTreesRegressor(ForestRegressor):
                  bootstrap=False,
                  oob_score=False,
                  n_jobs=1,
+                 shared=False,
                  random_state=None,
                  verbose=0,
                  min_density=None,
@@ -1172,6 +1207,7 @@ class ExtraTreesRegressor(ForestRegressor):
             bootstrap=bootstrap,
             oob_score=oob_score,
             n_jobs=n_jobs,
+            shared=shared,
             random_state=random_state,
             verbose=verbose)
 
@@ -1256,6 +1292,7 @@ class RandomTreesEmbedding(BaseForest):
                  min_samples_split=2,
                  min_samples_leaf=1,
                  n_jobs=1,
+                 shared=False,
                  random_state=None,
                  verbose=0,
                  min_density=None):
@@ -1268,6 +1305,7 @@ class RandomTreesEmbedding(BaseForest):
             bootstrap=False,
             oob_score=False,
             n_jobs=n_jobs,
+            shared=shared,
             random_state=random_state,
             verbose=verbose)
 
